@@ -22,6 +22,9 @@ jobs:
       - name: Publish Blazor Project
         run: dotnet publish -c Release -o release
 
+      - name: Update Base Href for Subfolder
+        run: sed -i 's/<base href="\/" \/>/<base href="\/sudoku\/" \/>/g' release/wwwroot/index.html
+
       - name: Deploy via SFTP
         uses: wlixcc/SFTP-Deploy-Action@v1.2.6
         with:
