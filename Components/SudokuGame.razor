@@ -1,0 +1,265 @@
+﻿<style>
+	* {
+		box-sizing: border-box;
+	}
+
+	body {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		flex-direction: column;
+		height: 100vh;
+		margin: 0;
+		padding: 20px;
+		position: relative;
+		overflow-x: hidden;
+		text-align: center;
+	}
+
+	.sudokuContainer {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		grid-template-rows: repeat(3, 1fr);
+		border: 3px solid black;
+		width: 80vmin;
+		max-width: 90vw;
+		aspect-ratio: 1;
+		margin: 20px auto;
+	}
+
+
+	.subSquareContainer {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		grid-template-rows: repeat(3, 1fr);
+		border: 2px solid black;
+		padding: 0;
+	}
+
+	.subSquareContainer > * {
+		width: 100%;
+		height: 100%;
+	}
+
+	.noWinYet {
+		visibility: hidden;
+	}
+
+	.mistakes {
+		position: absolute;
+		top: 10px;
+		right: 20px;
+		font-size: 1.5em;
+		font-weight: bold;
+		border: 2px solid black;
+		border-radius: 10px;
+		padding: 10px;
+		background-color: white;
+		max-width: 90vw;
+		overflow-wrap: break-word;
+	}
+
+	.newGame {
+		margin-top: 10px;
+		background-color: #4CAF50;
+		color: white;
+		font-size: 1.2em;
+		font-weight: bold;
+		padding: 10px 20px;
+		border: none;
+		border-radius: 5px;
+		cursor: pointer;
+		transition: background-color 0.3s, transform 0.2s;
+		max-width: 90vw;
+		overflow-wrap: break-word;
+	}
+
+	.newGame:hover {
+		background-color: #45a049;
+		transform: scale(1.05);
+	}
+
+	.newGame:active {
+		background-color: #2e7e31;
+	}
+
+	@@media (max-width: 800px) {
+		body {
+			height: auto;
+			align-items: center;
+		}
+
+		.mistakes {
+			position: static;
+			margin: 10px auto 0 auto;
+			width: fit-content;
+			align-self: center;
+		}
+
+		.newGame {
+			align-self: center;
+			margin-bottom: 20px;
+		}
+	}
+
+</style>
+
+
+
+<div class="sudokuContainer">
+	@for (int i = 0; i < 9; i++)
+	{
+		<div class="subSquareContainer">
+			@for (int j = 0; j < 9; j++)
+			{
+				int x = 3 * (i / 3) + (j / 3);
+				int y = 3 * (i % 3) + (j % 3);
+				<SudokuButton x="x"
+							  y="y"
+							  value="sudoku[x][y]"
+							  revealed="revealedCells[x,y]"
+							  onMistake="() => mistakes++"
+							  onCorrect="handleCorrect" />
+			}
+		</div>
+	}
+</div>
+<button class="newGame" @onclick="newSudoku">New Game</button>
+<div class="mistakes">
+	<p>
+		Mistakes: @mistakes
+	</p>
+</div>
+<p class="@(wonGame ? " " : "noWinYet")">Congratulations, you completed the puzzle with @mistakes mistakes!</p>
+
+
+@code {
+	// sudoku rules:
+	// 1. numbers 1-9 on all columns
+	// 2. numbers 1-9 on all rows
+	// 3. numbers 1-9 in all the 3x3 squares
+	// 4. 3 mistakes and you're out
+
+	// steps
+	// fill out the array diagonal squares with random 1-9 (doesn't overlap :D)
+	// backtrack over the next solutions:
+	//      - if number doesn't exist in column or in row or in square, add it
+	//      - else try next number
+	// decide how the fuck I'm gonna decide which numbers to reveal
+
+	const char EMPTY_CELL = ' ';
+	const int BOARD_SIZE = 9;
+
+	char[][] sudoku = new char[BOARD_SIZE][];
+	bool[,] revealedCells = new bool[BOARD_SIZE, BOARD_SIZE];
+	int mistakes = 0;
+	bool wonGame = false;
+
+	Random r = new Random();
+
+	protected override void OnInitialized()
+	{
+		for (int i = 0; i < BOARD_SIZE; i++)
+		{
+			sudoku[i] = Enumerable.Repeat(EMPTY_CELL, BOARD_SIZE).ToArray();
+			for (int j = 0; j < BOARD_SIZE; j++)
+				revealedCells[i, j] = true;
+		}
+		mistakes = 0;
+		wonGame = false;
+
+		Console.WriteLine(typeof(Microsoft.AspNetCore.Components.ComponentBase).Assembly.GetName().Version);
+	}
+
+	private void handleCorrect((int, int) coords)
+	{
+		revealedCells[coords.Item1, coords.Item2] = true;
+		if (revealedCells.Cast<bool>().All(cell => cell))
+			wonGame = true;
+	}
+
+	private void newSudoku(MouseEventArgs e)
+	{
+		OnInitialized();
+
+		fillDiagonalSubgrids();
+
+		fillSudoku();
+
+		for (int i = 0; i < 9; i++)
+			for (int j = 0; j < 9; j++)
+				revealedCells[i, j] = r.Next(0, 99) < 40;
+
+		mistakes = 0;
+	}
+
+	private void fillDiagonalSubgrids()
+	{
+		for (int i = 0; i < 3; i++)
+		{
+			List<char> availableNumbers = new List<char>("123456789");
+			for (int j = i * 3; j < (i + 1) * 3; j++)
+				for (int k = i * 3; k < (i + 1) * 3; k++)
+				{
+					int index = r.Next(availableNumbers.Count);
+					sudoku[j][k] = availableNumbers[index];
+					availableNumbers.RemoveAt(index);
+				}
+		}
+	}
+
+	// if is outside of column bounds, move to next row
+	// if row is out of bounds, you're done
+
+	// if cell is not empty, move on
+	// check all numbers until one is in a good position, then move on
+	// if no good positions are found, erase both current and previous cells, keeping the previous cell's value and restarting with that
+	private bool fillSudoku()
+	{
+		for (int row = 0; row < BOARD_SIZE; row++)
+			for (int col = 0; col < BOARD_SIZE; col++)
+				if (sudoku[row][col] == EMPTY_CELL)
+				{
+					for (int number = 1; number <= 9; number++)
+						if (isValidPlacement(number, row, col))
+						{
+							sudoku[row][col] = (char)(number + 48);
+							if (fillSudoku())
+								return true;
+							sudoku[row][col] = EMPTY_CELL;
+						}
+					return false;
+				}
+		return true;
+	}
+
+	private bool numberOnRow(int number, int row)
+	{
+		return string.Join("", sudoku[row]).Contains(number.ToString());
+	}
+
+	private bool numberOnColumn(int number, int column)
+	{
+		for (int i = 0; i < BOARD_SIZE; i++)
+			if (sudoku[i][column] == (char)(number + 48))
+				return true;
+		return false;
+	}
+
+	private bool numberInSubsquare(int number, int row, int column)
+	{
+		int squareRow = (row / 3) * 3;
+		int squareColumn = (column / 3) * 3;
+
+		for (int i = squareRow; i < squareRow + 3; i++)
+			for (int j = squareColumn; j < squareColumn + 3; j++)
+				if (sudoku[i][j] == (char)(number + 48))
+					return true;
+		return false;
+	}
+
+	private bool isValidPlacement(int number, int row, int column)
+	{
+		return !numberOnRow(number, row) && !numberOnColumn(number, column) && !numberInSubsquare(number, row, column);
+	}
+}

@@ -1,0 +1,61 @@
+﻿<button class="@(revealed ? "revealed" : "hidden") @isSelected" @onclick="selectButton" @onblur="unselectButton" @onkeydown="handleKeyPress">@value</button>
+
+<style>
+	.revealed {
+		background-color: #d3d3d3;
+		color: black;
+		font-size: 2em;
+		pointer-events: none;
+		transition: background-color 0.3s ease-in-out;
+	}
+
+	.hidden {
+		background-color: #f8f8f8;
+		color: transparent;
+		border: 1px solid black;
+		transition: background-color 0.3s ease-in-out;
+	}
+
+	.selected {
+		background-color: aquamarine;
+		transition: background-color 0.3s ease-in-out;
+	}
+</style>
+
+
+@code {
+	[Parameter] public int x { get; set; }
+	[Parameter] public int y { get; set; }
+	[Parameter] public char value { get; set; }
+	[Parameter] public bool revealed { get; set; }
+	[Parameter] public EventCallback onMistake { get; set; }
+	[Parameter] public EventCallback<(int, int)> onCorrect { get; set; }
+
+	public string isSelected = "unselected";
+
+	private void selectButton(MouseEventArgs e)
+	{
+		isSelected = "selected";
+	}
+
+	private void unselectButton()
+	{
+		isSelected = "unselected";
+	}
+
+	private async void handleKeyPress(KeyboardEventArgs e)
+	{
+		if (Char.IsNumber(e.Key[0]) && e.Key[0] != '0')
+		{
+			if (value != e.Key[0] && isSelected == "selected")
+			{
+				await onMistake.InvokeAsync();
+			}
+			else
+			{
+				await onCorrect.InvokeAsync((x,y));
+				unselectButton();
+			}
+		}
+	}
+}
