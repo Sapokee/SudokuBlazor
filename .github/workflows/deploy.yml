@@ -1,0 +1,33 @@
+name: Blazor Build and SFTP Deploy
+
+on:
+  push:
+    branches:
+      - main 
+  workflow_dispatch: 
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up .NET Core
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '7.0.x'
+
+      - name: Publish Blazor Project
+        run: dotnet publish -c Release -o release
+
+      - name: Deploy via SFTP
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.6
+        with:
+          server: ${{ secrets.SFTP_HOST }}
+          port: ${{ secrets.SFTP_PORT }}
+          username: ${{ secrets.SFTP_USERNAME }}
+          password: ${{ secrets.SFTP_PASSWORD }}
+          remote_path: ${{ secrets.SFTP_TARGET_PATH }}
+          local_path: './release/wwwroot/*'
